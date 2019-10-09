@@ -1,8 +1,8 @@
 //
-// Copyright (c) 2019 Sean Reynolds, Stefaan Coussement
+// Copyright (c) 2019 Stefaan Coussement
 // MIT License
 //
-// more info: https://github.com/stefaanc/terraform-provider-hyperv
+// more info: https://github.com/stefaanc/golang-exec
 //
 package runner
 
@@ -11,9 +11,9 @@ import (
     "io"
     "strings"
 
-    "github.com/stefaanc/terraform-provider-hyperv/exec/script"
-    "github.com/stefaanc/terraform-provider-hyperv/exec/runner/local"
-    "github.com/stefaanc/terraform-provider-hyperv/exec/runner/ssh"
+    "github.com/stefaanc/golang-exec/script"
+    "github.com/stefaanc/golang-exec/runner/local"
+    "github.com/stefaanc/golang-exec/runner/ssh"
 )
 
 //------------------------------------------------------------------------------

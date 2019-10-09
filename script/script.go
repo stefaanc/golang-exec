@@ -1,8 +1,8 @@
 //
-// Copyright (c) 2019 Sean Reynolds, Stefaan Coussement
+// Copyright (c) 2019 Stefaan Coussement
 // MIT License
 //
-// more info: https://github.com/stefaanc/terraform-provider-hyperv
+// more info: https://github.com/stefaanc/golang-exec
 //
 package script
 
