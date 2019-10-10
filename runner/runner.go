@@ -9,6 +9,7 @@ package runner
 import (
     "fmt"
     "io"
+    "reflect"
     "strings"
 
     "github.com/stefaanc/golang-exec/script"
@@ -17,10 +18,6 @@ import (
 )
 
 //------------------------------------------------------------------------------
-
-type Connection struct {
-    Type string   // "local" or "ssh"
-}
 
 type Runner interface {
     SetStdoutWriter(io.Writer)
@@ -38,15 +35,53 @@ type Runner interface {
 
 //------------------------------------------------------------------------------
 
+func Run(connection interface {}, s *script.Script, arguments interface{}) error {
+    if s.Error != nil {
+        return s.Error
+    }
+
+    r, err := New(connection, s, arguments)
+    if err != nil {
+        return err
+    }
+    defer r.Close()
+
+    err = r.Run()
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
 func New(connection interface {}, s *script.Script, arguments interface{}) (Runner, error) {
-    c := connection.(*Connection)
-    switch strings.ToLower(c.Type) {
+    if s.Error != nil {
+        return nil, s.Error
+    }
+
+    v := reflect.Indirect(reflect.ValueOf(connection))
+    t := reflect.TypeOf(connection)
+
+    var cType string
+    if t.Kind() == reflect.Struct {
+        cType = strings.ToLower(v.FieldByName("Type").String())
+    } else {
+        iter := v.MapRange()
+        for iter.Next() {
+            if iter.Key().String() == "Type" {
+                cType = strings.ToLower(iter.Value().String())
+                break
+            }
+        }
+    }
+
+    switch cType {
     case "local":
         return local.New(connection, s, arguments)
     case "ssh":
         return ssh.New(connection, s, arguments)
     default:
-        return nil, fmt.Errorf("[ERROR][terraform-provider-hyperv/exec/runner/New()] invalid 'Type' in 'Connection'")
+        return nil, fmt.Errorf("[golang-exec/runner/New()] invalid 'Type' in 'connection' parameter")
     }
 }
 

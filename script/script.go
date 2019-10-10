@@ -8,8 +8,8 @@ package script
 
 import (
     "bytes"
+    "fmt"
     "io"
-    "log"
     "strings"
     "text/template"
 )
@@ -33,7 +33,7 @@ func New(name string, shell string, code string) *Script {
     // this allows using New() in a package scope, while checking for errors in a function scope
     template, err := template.New(name).Parse(code)
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/script/New()] cannot parse script: %#v\n", err.Error())
+        err = fmt.Errorf("[golang-exec/script/New()] cannot parse script: %#w\n", err)
     }
 
     s := new(Script)
@@ -52,8 +52,7 @@ func New(name string, shell string, code string) *Script {
 func NewFromString(name string, shell string, code string) (*Script, error) {
     template, err := template.New(name).Parse(code)
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/script/NewFromString()] cannot parse script: %#v\n", err.Error())
-        return nil, err
+        return nil, fmt.Errorf("[golang-exec/script/NewFromString()] cannot parse script: %#w\n", err)
     }
 
     s := new(Script)
@@ -67,8 +66,7 @@ func NewFromString(name string, shell string, code string) (*Script, error) {
 func NewFromFile(name string, shell string, file string) (*Script, error) {
     template, err := template.New(name).ParseFiles(file)
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/script/NewFromFile()] cannot parse script: %#v\n", err.Error())
-        return nil, err
+        return nil, fmt.Errorf("[golang-exec/script/NewFromFile()] cannot parse script: %#w\n", err)
     }
 
     s := new(Script)
@@ -99,8 +97,7 @@ func (s *Script) NewReader(arguments interface{}) (io.Reader, error) {
     if s.template != nil {
         err := s.template.Execute(&rendered, arguments)
         if err != nil {
-            log.Printf("[ERROR][terraform-provider-hyperv/exec/script/NewReader()] cannot render script: %#v\n", err.Error())
-            return nil, err
+            return nil, fmt.Errorf("[golang-exec/script/NewReader()] cannot render script: %#w\n", err)
         }
     }
 

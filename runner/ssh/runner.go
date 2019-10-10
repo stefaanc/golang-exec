@@ -12,8 +12,10 @@ import (
     "github.com/mitchellh/go-homedir"
     "io"
     "golang.org/x/crypto/ssh/knownhosts"
-    "log"
+    "reflect"
     "golang.org/x/crypto/ssh"
+    "strconv"
+    "strings"
 
     "github.com/stefaanc/golang-exec/script"
 )
@@ -21,9 +23,9 @@ import (
 //------------------------------------------------------------------------------
 
 type Connection struct {
-    Type     string   // "ssh"
+    Type     string   // must be "ssh"
     Host     string
-    Port     int16
+    Port     uint16
     User     string
     Password string
     Insecure bool
@@ -45,7 +47,7 @@ func New(connection interface{}, s *script.Script, arguments interface{}) (*Runn
         return nil, s.Error
     }
 
-    c := connection.(Connection)
+    c := toConnection(connection)
     r := new(Runner)
     r.command = s.Command()
 
@@ -68,38 +70,78 @@ func New(connection interface{}, s *script.Script, arguments interface{}) (*Runn
     } else {
         f, err := homedir.Expand("~/.ssh/known_hosts")
         if err != nil {
-            log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/New()] cannot find home directory of current user: %#v\n", err.Error())
             r.exitCode = -1
-            return nil, err
+            return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot find home directory of current user: %#w\n", err)
         }
 
         hostKeyCallback, err := knownhosts.New(f)
         if err != nil {
-            log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/New()] cannot access 'known_hosts'-file: %#v\n", err.Error())
             r.exitCode = -1
-            return nil, err
+            return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot access 'known_hosts'-file: %#w\n", err)
         }
         config.HostKeyCallback = hostKeyCallback
     }
 
     client, err := ssh.Dial("tcp", address, config)
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/New()] cannot dial host: %#v\n", err.Error())
         r.exitCode = -1
-        return nil, err
+        return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot dial host: %#w\n", err)
     }
     r.client = client
 
     session, err := client.NewSession()
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/New()] cannot open session: %#v\n", err.Error())
         r.exitCode = -1
-        return nil, err
+        return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot open session: %#w\n", err)
     }
     r.session = session
     r.session.Stdin  = stdin
 
     return r, nil
+}
+
+func toConnection(connection interface{}) *Connection {
+    c := new(Connection)
+
+    v := reflect.Indirect(reflect.ValueOf(connection))
+    t := reflect.TypeOf(connection)
+
+    if t.Kind() == reflect.Struct {
+        c.Type     = v.FieldByName("Type").String()
+        c.Host     = v.FieldByName("Host").String()
+        c.Port     = uint16( v.FieldByName("Port").Uint() )
+        c.User     = v.FieldByName("User").String()
+        c.Password = v.FieldByName("Password").String()
+        c.Insecure = v.FieldByName("Insecure").Bool()
+    } else if t.Kind() == reflect.Map {
+        iter := v.MapRange()
+        for iter.Next() {
+            switch iter.Key().String() {
+            case "Type":
+                c.Type     = iter.Value().String()
+            case "Host":
+                c.Host     = iter.Value().String()
+            case "Port":
+                p, err := strconv.ParseUint(iter.Value().String(), 10, 16)
+                if err != nil {
+                    p = 0
+                }
+                c.Port     = uint16(p)
+            case "User":
+                c.User     = iter.Value().String()
+            case "Password":
+                c.Password = iter.Value().String()
+            case "Insecure":
+                b, err := strconv.ParseBool(strings.ToLower(iter.Value().String()))
+                if err != nil {
+                    b = false
+                }
+                c.Insecure = b
+            }
+        }
+    }
+
+    return c
 }
 
 //------------------------------------------------------------------------------
@@ -115,29 +157,44 @@ func (r *Runner) SetStderrWriter(stderr io.Writer) {
 func (r *Runner) StdoutPipe() (io.Reader, error) {
     reader, err := r.session.StdoutPipe()
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/StdoutPipe()] cannot create stdout reader: %#v\n", err.Error())
         r.exitCode = -1
+        return nil, fmt.Errorf("[golang-exec/runner/ssh/StdoutPipe()] cannot create stdout reader: %#w\n", err)
     }
 
-    return reader, err
+    return reader, nil
 }
 
 func (r *Runner) StderrPipe() (io.Reader, error) {
     reader, err := r.session.StderrPipe()
     if err != nil {
-       log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/StderrPipe()] cannot create stderr reader: %#v\n", err.Error())
         r.exitCode = -1
+        return nil, fmt.Errorf("[golang-exec/runner/ssh/StderrPipe()] cannot create stderr reader: %#w\n", err)
     }
 
-    return reader, err
+    return reader, nil
+}
+
+func (r *Runner) Run() error {
+    err := r.session.Run(r.command)
+    if err != nil {
+        var exitErr *ssh.ExitError
+        if errors.As(err, &exitErr) {
+            r.exitCode = exitErr.Waitmsg.ExitStatus()
+        } else {
+            r.exitCode = -1
+        }
+        return fmt.Errorf("[golang-exec/runner/ssh/Run()] cannot execute runner: %#w\n", err)
+    }
+    r.running = true
+
+    return nil
 }
 
 func (r *Runner) Start() error {
     err := r.session.Start(r.command)
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/Start()] cannot start runner: %#v\n", err.Error())
         r.exitCode = -1
-        return err
+        return fmt.Errorf("[golang-exec/runner/ssh/Start()] cannot start runner: %#w\n", err)
     }
     r.running = true
 
@@ -154,9 +211,7 @@ func (r *Runner) Wait() error {
         } else {
             r.exitCode = -1
         }
-
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/ssh/Wait()] runner failed: %#v\n", err.Error())
-        return err
+        return fmt.Errorf("[golang-exec/runner/ssh/Wait()] runner failed: %#w\n", err)
     }
 
     r.exitCode = 0

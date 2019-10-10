@@ -9,8 +9,8 @@ package local
 import (
     "context"
     "errors"
+    "fmt"
     "io"
-    "log"
     "os/exec"
     "strings"
 
@@ -20,7 +20,7 @@ import (
 //------------------------------------------------------------------------------
 
 type Connection struct {
-    Type string   // "local"
+    Type string   // must be "local"
 }
 
 type Runner struct {
@@ -69,21 +69,21 @@ func (r *Runner) SetStderrWriter(stderr io.Writer) {
 func (r *Runner) StdoutPipe() (io.Reader, error) {
     reader, err := r.cmd.StdoutPipe()
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/local/StdoutPipe()] cannot create stdout reader: %#v\n", err.Error())
         r.exitCode = -1
+        return nil, fmt.Errorf("[golang-exec/runner/local/StdoutPipe()] cannot create stdout reader: %#w\n", err)
     }
 
-    return reader, err
+    return reader, nil
 }
 
 func (r *Runner) StderrPipe() (io.Reader, error) {
     reader, err := r.cmd.StderrPipe()
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/local/StderrPipe()] cannot create stderr reader: %#v\n", err.Error())
         r.exitCode = -1
+        return nil, fmt.Errorf("[golang-exec/runner/local/StderrPipe()] cannot create stderr reader: %#w\n", err)
     }
 
-    return reader, err
+    return reader, nil
 }
 
 func (r *Runner) Run() error {
@@ -95,9 +95,7 @@ func (r *Runner) Run() error {
         } else {
             r.exitCode = -1
         }
-
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/local/Run()] runner failed: %#v\n", err.Error())
-        return err
+        return fmt.Errorf("[golang-exec/runner/local/Run()] cannot execute runner: %#w\n", err)
     }
 
     r.exitCode = 0
@@ -107,9 +105,8 @@ func (r *Runner) Run() error {
 func (r *Runner) Start() error {
     err := r.cmd.Start()
     if err != nil {
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/local/Start()] cannot start runner: %#v\n", err.Error())
         r.exitCode = -1
-        return err
+        return fmt.Errorf("[golang-exec/runner/local/Start()] cannot start runner: %#w\n", err)
     }
 
     return nil
@@ -124,9 +121,7 @@ func (r *Runner) Wait() error {
         } else {
             r.exitCode = -1
         }
-
-        log.Printf("[ERROR][terraform-provider-hyperv/exec/runner/local/Wait()] runner failed: %#v\n", err.Error())
-        return err
+        return fmt.Errorf("[golang-exec/runner/local/Wait()] runner failed: %#w\n", err)
     }
 
     r.exitCode = 0

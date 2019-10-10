@@ -1,34 +1,103 @@
 # Golang Exec
 
-**a golang package to run scripts locally or via SSH**
+**a golang package to run scripts locally or remotely**
 
-Scripts can be defined as a string or can be loaded from a file.  They are parsed as a golang template.  This template can then be rendered with template-arguments.  The resulting rendered code is either executed on the local machine or remotely via SHH.  A shell is started on the machine, the script is loaded via stdin, and is executed in the shell.  Results from the script can be received from stdout.  Errors can be received from stderr.
+The main use-case for this package is to run scripts that are embedded in a golang executable, and run them locally or remotely.  An example where this is used is in the development of a terraform provider (this is the reason why we developed this).
 
-The main use-case for this is
-- script-code needs to be embedded in the golang executable
-- script needs to run local or on remote servers
+Scripts can be defined at development-time as a string or can be read at run-time from a file.  They are parsed as a golang template.  This template is then rendered with template-arguments.  The resulting rendered code is either executed on the local machine or remotely.  A shell is started on the machine, the script is loaded via `stdin`, and is executed in the shell.  A number of shells are supported: windows cmd, powershell, bash, sh, ... The script is uploaded via `stdin` to avoid having to separately upload it before running (for instance using SCP) and to avoid having to clean up after running.  Results from the script can be received from the shell's `stdout`.  Errors can be received from the shell's `stderr`.
 
+As an alternative to using the `Connection` types from the specific runners - "golang-exec/runner/local" or "golang-exec/runner/ssh" - you can make your own connection struct type or embed this in your own bigger struct type.  Your struct type must contain the relevant fields with the same field-names as the fields required for the specific runner.  The golang-exec package uses reflection to extract the connection information from your struct.  This is useful when the connection type needs to be configurable, so it is not known in advance which specific runner will be used.
 
-A typical example of this is the development of a terraform provider - this is the reason why we developed this.
+For a `"local"` runner, you need at least the following fields
 
+```golang
+type Connection struct {
+    Type string   // must be "local"
+}
+```
+
+For a `"ssh"` runner, you need at least the following fields
+
+```golang
+type Connection struct {
+    Type     string   // must be "ssh"
+    Host     string
+    Port     uint16
+    User     string
+    Password string
+    Insecure bool
+}
+```
+
+As another alternative to using the `Connection` types from the specific runners, you can also use a map: `map[string]string`.  Disadvantage of this is that fields with a non-string type are not statically type-checked.
 
 
 
 <br/>
-
-### !!! UNDER CONSTRUCTION !!!!!!!!
-
-<br/>
-
-
 
 ## Basic Use
 
-A couple of very (, very, very) basic examples
+A couple of very basic examples.
 
 ### Using runner.Run()
 
+To test this, make a file `~\Projects\golang-exec\examples\run\test.txt` (or change the path  in the code to a file of your choosing).
+
+```golang
+package main
+
+import (
+    "fmt"
+    "log"
+    "github.com/stefaanc/golang-exec/script"
+    "github.com/stefaanc/golang-exec/runner"
+    "github.com/stefaanc/golang-exec/runner/ssh"
+)
+
+func main() {
+    // define connection to the server
+    c := ssh.Connection{
+       Type: "ssh",
+       Host: "localhost",
+       Port: 22,
+       User: "me",
+       Password: "my-password",
+       Insecure: true,
+    }
+
+    // create script runner
+    err := runner.Run(c, rmScript, rmArguments{
+        Path: "~\\Projects\\golang-exec\\examples\\run\\test.txt",
+    })
+    if err != nil {
+         log.Fatal(err)
+    }
+
+    // write the result
+    fmt.Printf("done")
+}
+
+type rmArguments struct{
+    Path string
+}
+
+var rmScript = script.New("rm", "powershell", `
+    $ErrorActionPreference = 'Stop'
+
+    $path = "{{.Path}}"
+    Get-ChildItem -Path $path | Remove-Item
+
+    exit 0
+`)
+```
+
+> Remark that in this example
+> - we use the `Connection` type from the `"ssh"` runner
+> - we don't capture any results
+
 ### Using runner.New() and r.Run()
+
+To test this, make a folder `~/Documents/Test` and put some files in it.
 
 ```golang
 package main
@@ -44,39 +113,33 @@ import (
 type myConnection struct {
     Type     string
     Host     string
-    Port     int16
+    Port     uint16
     User     string
     Password string
     Insecure bool
 }
 
-func main {
-    // check if script is successfully parsed
-    err := dirScript.Error
-    if err != nil {
-         log.Fatal(err)
-    }
-
+func main() {
     // define connection to the server
     c := myConnection{
-       Type: "ssh"
-       Host: "localhost"
-       Port: 22
-       User: "me"
-       Password: "my-password"
-       Insecure: true
+       Type: "ssh",
+       Host: "localhost",
+       Port: 22,
+       User: "me",
+       Password: "my-password",
+       Insecure: true,
     }
 
     // create script runner
-    r, err := runner.New(c, dirScript, dirArguments{
-        Path: "~/Documents",
+    r, err := runner.New(c, lsScript, lsArguments{
+        Path: "~\\Projects\\golang-exec\\examples\\new-and-run",
     })
     if err != nil {
          log.Fatal(err)
     }
     defer r.Close()
 
-    // create buffer to capture stdout
+    // create buffer to capture stdout, set a stdout-writer
     var stdout bytes.Buffer
     r.SetStdoutWriter(&stdout)
 
@@ -90,25 +153,104 @@ func main {
     fmt.Printf(stdout.String())
 }
 
-type dirArguments struct{
+type lsArguments struct{
     Path string
 }
 
-var dirScript = script.New("dir", "powershell", `
-$ErrorActionPreference = 'Stop'
+var lsScript = script.New("", "powershell", `
+    $ErrorActionPreference = 'Stop'
 
-$path = "{{.Path}}"
-Get-ChildItem -Path $path | Format-Table
+    $path = "{{.Path}}"
+    Get-ChildItem -Path $path | Format-Table
 
-exit 0
+    exit 0
 `)
 ```
 
+> Remark that in this example 
+> - we are using our own `Connection` type
+> - we are capturing results using a stdout-writer
+
 ### Using runner.New() and r.Start() / r.Wait()
 
-```golang
+To test this, make a folder `~/Documents/Test` and put some files in it.
 
+```golang
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "log"
+    "github.com/stefaanc/golang-exec/script"
+    "github.com/stefaanc/golang-exec/runner"
+)
+
+func main() {
+    // define connection to the server
+    c := map[string]string{
+       "Type": "ssh",
+       "Host": "localhost",
+       "Port": "22",
+       "User": "me",
+       "Password": "my-password",
+       "Insecure": "true",
+    }
+
+    // create script runner
+    r, err := runner.New(c, lsScript, lsArguments{
+        Path: "~\\Projects\\golang-exec\\examples\\new-and-start-wait",
+    })
+    if err != nil {
+         log.Fatal(err)
+    }
+    defer r.Close()
+
+    // get a stdout-reader
+    stdout, err := r.StdoutPipe()
+    if err != nil {
+         log.Fatal(err)
+    }
+
+    // start script runner
+    err = r.Start()
+    if err != nil {
+         log.Fatal(err)
+    }
+
+    // wait for stdout-reader to complete
+    result, err := ioutil.ReadAll(stdout)
+    if err != nil {
+         log.Fatal(err)
+    }
+
+    // wait for script runner to complete
+    err = r.Wait()
+    if err != nil {
+         log.Fatal(err)
+    }
+
+    // write the result
+    fmt.Printf(string(result))
+}
+
+type lsArguments struct{
+    Path string
+}
+
+var lsScript = script.New("ls", "powershell", `
+    $ErrorActionPreference = 'Stop'
+
+    $path = "{{.Path}}"
+    Get-ChildItem -Path $path | Format-Table
+
+    exit 0
+`)
 ```
+
+> Remark that in this example 
+> - we are using a map for our connection info
+> - we are capturing results using a stdout-reader
 
 
 
@@ -171,8 +313,9 @@ import (
 type Runner interface {
     SetStdoutWriter(io.Writer)
     SetStderrWriter(io.Writer)
-    StdoutPipe() (io.Reader, error)   // use in combination with Start() & Wait(), don't use in combination with Run()
-    StderrPipe() (io.Reader, error)   // use in combination with Start() & Wait(), don't use in combination with Run()
+
+    StdoutPipe() (io.Reader, error)   // don't use in combination with Run()
+    StderrPipe() (io.Reader, error)   // don't use in combination with Run()
 
     Run() error
     Start() error
@@ -181,6 +324,8 @@ type Runner interface {
 
     ExitCode() int   // -1 when runner error without completing script
 }
+
+func Run(connection interface {}, s *script.Script, arguments interface{}) error { /*...*/ }
 
 func New(connection interface {}, s *script.Script, arguments interface{}) (Runner, error) { /*...*/ }
 ```
@@ -198,7 +343,7 @@ import (
 )
 
 type Connection struct {
-    Type string   // "local"
+    Type string   // must be "local"
 }
 
 type Runner struct {
@@ -222,9 +367,9 @@ import (
 )
 
 type Connection struct {
-    Type     string   // "ssh"
+    Type     string   // must be "ssh"
     Host     string
-    Port     int16
+    Port     uint16
     User     string
     Password string
     Insecure bool
@@ -244,6 +389,7 @@ type Runner struct {
 
 ## For Further Investigation
 
+- support for setting environment variables
 - support for SSH auth using certificates instead of password
 - support for Pageant on Windows
 - support for SSH bastion server
