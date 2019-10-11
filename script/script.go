@@ -10,6 +10,7 @@ import (
     "bytes"
     "fmt"
     "io"
+    "os"
     "strings"
     "text/template"
 )
@@ -18,8 +19,8 @@ import (
 
 type Script struct {
     Name       string
+    Shell      string   // "cmd", powershell", "bash", "sh", ...
 
-    shell      string   // "cmd", powershell", "bash", "sh", ...
     template   *template.Template
 
     Error      error    // error from NewScript()
@@ -40,7 +41,7 @@ func New(name string, shell string, code string) *Script {
     s.Name = name
 
     if err == nil {
-        s.shell = shell
+        s.Shell = strings.ToLower(shell)
         s.template = template
     } else {
         s.Error = err
@@ -57,7 +58,7 @@ func NewFromString(name string, shell string, code string) (*Script, error) {
 
     s := new(Script)
     s.Name = name
-    s.shell = shell
+    s.Shell = strings.ToLower(shell)
     s.template = template
 
     return s, nil
@@ -71,7 +72,7 @@ func NewFromFile(name string, shell string, file string) (*Script, error) {
 
     s := new(Script)
     s.Name = name
-    s.shell = shell
+    s.Shell = strings.ToLower(shell)
     s.template = template
 
     return s, nil
@@ -81,13 +82,33 @@ func NewFromFile(name string, shell string, file string) (*Script, error) {
 
 func (s *Script) Command() string {
     // returns the command(s) to execute a script that is read from stdin
-    switch strings.ToLower(s.shell) {
+    switch s.Shell {
     case "cmd":
-        return "set T=_temp~%RANDOM%.bat && more > %T% && cmd /C %T% && del /Q %T%"
+        // for cmd, we cannot execute code directly from stdin
+        // hence we save stdin (the rendered code) to a file and then execute that file
+        //
+        // the steps in the command are:
+        // - run a cmd command, enable delayed expansion
+        // - set the name of a temp file
+        // - use "more" to save stdin to temp-file
+        // - use "cmd" to execute temp-file
+        // - save "%errorlevel%" because it will be overwritten by the next step
+        // - delete temp-file
+        // - exit with saved "%errorlevel%"
+        wd, _ := os.Getwd()
+        return fmt.Sprintf("cmd /E:ON /V:ON /C \"set \"T=%s\\_temp-%%RANDOM%%.bat\" && more > !T! && cmd /C \"!T!\" & set \"E=!errorlevel!\" & del /Q !T! & exit !E!\"", wd)
     case "powershell":
-        return "PowerShell -NoProfile -ExecutionPolicy ByPass -Command -"
+        // for powershell, we can  execute code directly from stdin, returning "PowerShell -NoProfile -ExecutionPolicy ByPass -Command -"
+        // however, it seems that fatal exceptions don't stop the script, and thus "$ErrorActionPreference = 'Stop'" also doesn't work properly
+        // hence we save stdin (the rendered code) to a file using cmd and then execute that file using powershell
+        //
+        // the steps in the command are similar to the steps for the cmd shell
+        s.Shell = "cmd"
+        wd, _ := os.Getwd()
+        return fmt.Sprintf("cmd /E:ON /V:ON /C \"set \"T=%s\\_temp~%%RANDOM%%.ps1\" && more > !T! && PowerShell -NoProfile -ExecutionPolicy ByPass -Command \"!T!\" & set \"E=!errorlevel!\" & del /Q !T! & exit !E!\"", wd)
     default:
-        return s.shell + " -"
+        // for bash,... we execute code directly from stdin
+        return s.Shell + " -"
     }
 }
 

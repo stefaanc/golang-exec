@@ -180,13 +180,14 @@ func (r *Runner) Run() error {
         var exitErr *ssh.ExitError
         if errors.As(err, &exitErr) {
             r.exitCode = exitErr.Waitmsg.ExitStatus()
+            return fmt.Errorf("[golang-exec/runner/ssh/Run()] runner failed: %#w\n", err)
         } else {
             r.exitCode = -1
+            return fmt.Errorf("[golang-exec/runner/ssh/Run()] cannot execute runner: %#w\n", err)
         }
-        return fmt.Errorf("[golang-exec/runner/ssh/Run()] cannot execute runner: %#w\n", err)
     }
-    r.running = true
 
+    r.exitCode = 0
     return nil
 }
 

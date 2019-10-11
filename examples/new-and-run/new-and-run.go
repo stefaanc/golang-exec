@@ -4,8 +4,9 @@ import (
     "bytes"
     "fmt"
     "log"
-    "github.com/stefaanc/golang-exec/script"
+    "os"
     "github.com/stefaanc/golang-exec/runner"
+    "github.com/stefaanc/golang-exec/script"
 )
 
 type myConnection struct {
@@ -20,20 +21,22 @@ type myConnection struct {
 func main() {
     // define connection to the server
     c := myConnection{
-       Type: "ssh",
-       Host: "localhost",
-       Port: 22,
-       User: "me",
-       Password: "my-password",
-       Insecure: true,
+        Type: "ssh",
+        Host: "localhost",
+        Port: 22,
+        User: "me",
+        Password: "my-password",
+        Insecure: true,
     }
 
     // create script runner
+    wd, _ := os.Getwd()
     r, err := runner.New(c, lsScript, lsArguments{
-        Path: "~\\Projects\\golang-exec\\examples\\new-and-run",
+        Path: wd + "\\doesn't exist",
+//        Path: wd,
     })
     if err != nil {
-         log.Fatal(err)
+        log.Fatal(err)
     }
     defer r.Close()
 
@@ -41,25 +44,32 @@ func main() {
     var stdout bytes.Buffer
     r.SetStdoutWriter(&stdout)
 
+    // create buffer to capture stderr, set a stderr-writer
+    var stderr bytes.Buffer
+    r.SetStderrWriter(&stderr)
+
     // run script runner
     err = r.Run()
     if err != nil {
-         log.Fatal(err)
+        fmt.Printf("exitcode: %d\n", r.ExitCode())
+        fmt.Printf("errors: \n%s\n", stderr.String())
+        log.Fatal(err)
     }
 
     // write the result
-    fmt.Printf(stdout.String())
+    fmt.Printf("exitcode: %d\n", r.ExitCode())
+    fmt.Printf("result: \n%s", stdout.String())
 }
 
 type lsArguments struct{
     Path string
 }
 
-var lsScript = script.New("", "powershell", `
+var lsScript = script.New("ls", "powershell", `
     $ErrorActionPreference = 'Stop'
 
-    $path = "{{.Path}}"
-    Get-ChildItem -Path $path | Format-Table
+    $dirpath = "{{.Path}}"
+    Get-ChildItem -Path $dirpath | Format-Table
 
     exit 0
 `)

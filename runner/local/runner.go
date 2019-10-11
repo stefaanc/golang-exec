@@ -13,6 +13,7 @@ import (
     "io"
     "os/exec"
     "strings"
+    "syscall"
 
     "github.com/stefaanc/golang-exec/script"
 )
@@ -48,7 +49,15 @@ func New(connection interface{}, s *script.Script, arguments interface{}) (*Runn
     // create command, ready to start
     ctx, cancel := context.WithCancel(context.Background())
     args := strings.Split(s.Command(), " ")
-    cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+    var cmd *exec.Cmd
+    if s.Shell == "cmd" {
+        cmd = exec.CommandContext(ctx, args[0])
+        cmd.SysProcAttr = &syscall.SysProcAttr{
+            CmdLine: " " + strings.Join(args[1:], " "),
+        }
+    } else {
+        cmd = exec.CommandContext(ctx, args[0], args[1:]...)
+    }
     r.cmd = cmd
     r.cmd.Stdin  = stdin
     r.cancel = cancel
@@ -92,10 +101,11 @@ func (r *Runner) Run() error {
         var exitErr *exec.ExitError
         if errors.As(err, &exitErr) {
             r.exitCode = exitErr.ProcessState.ExitCode()
+            return fmt.Errorf("[golang-exec/runner/local/Run()] runner failed: %#w\n", err)
         } else {
             r.exitCode = -1
+            return fmt.Errorf("[golang-exec/runner/local/Run()] cannot execute runner: %#w\n", err)
         }
-        return fmt.Errorf("[golang-exec/runner/local/Run()] cannot execute runner: %#w\n", err)
     }
 
     r.exitCode = 0
