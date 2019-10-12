@@ -24,33 +24,56 @@ type Connection struct {
     Type string   // must be "local"
 }
 
+type Error struct {
+    script   *script.Script
+    exitCode int
+    err      error
+}
+
 type Runner struct {
-    cmd      *exec.Cmd
-    cancel   context.CancelFunc
+    script *script.Script
+    cmd    *exec.Cmd
+    cancel context.CancelFunc
 
     exitCode int
 }
 
 //------------------------------------------------------------------------------
 
+func (e *Error) Script()   *script.Script { return e.script }
+func (e *Error) ExitCode() int            { return e.exitCode }
+func (e *Error) Error()    string         { return e.err.Error() }
+func (e *Error) Unwrap()   error          { return e.err }
+
+//------------------------------------------------------------------------------
+
 func New(connection interface{}, s *script.Script, arguments interface{}) (*Runner, error) {
     if s.Error != nil {
-        return nil, s.Error
+        return nil, &Error{
+            script: s,
+            exitCode: -1,
+            err: fmt.Errorf("[golang-exec/runner/local/New()] script failed to parse: %#w\n", s.Error),
+        }
     }
 
     r := new(Runner)
+    r.script = s
 
     stdin, err := s.NewReader(arguments)
     if err != nil {
-        r.exitCode = -1
-        return nil, err
+        return nil, &Error{
+            script: s,
+            exitCode: -1,
+            err: fmt.Errorf("[golang-exec/runner/local/New()] cannot create stdin reader: %#w\n", err),
+        }
     }
 
     // create command, ready to start
     ctx, cancel := context.WithCancel(context.Background())
     args := strings.Split(s.Command(), " ")
     var cmd *exec.Cmd
-    if s.Shell == "cmd" {
+    if args[0] == "cmd" {
+        // cmd has argument-escaping rules that are different from other programs, so needs different treatment
         cmd = exec.CommandContext(ctx, args[0])
         cmd.SysProcAttr = &syscall.SysProcAttr{
             CmdLine: " " + strings.Join(args[1:], " "),
@@ -79,7 +102,11 @@ func (r *Runner) StdoutPipe() (io.Reader, error) {
     reader, err := r.cmd.StdoutPipe()
     if err != nil {
         r.exitCode = -1
-        return nil, fmt.Errorf("[golang-exec/runner/local/StdoutPipe()] cannot create stdout reader: %#w\n", err)
+        return nil, &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/local/StdoutPipe()] cannot create stdout reader: %#w\n", err),
+        }
     }
 
     return reader, nil
@@ -89,7 +116,11 @@ func (r *Runner) StderrPipe() (io.Reader, error) {
     reader, err := r.cmd.StderrPipe()
     if err != nil {
         r.exitCode = -1
-        return nil, fmt.Errorf("[golang-exec/runner/local/StderrPipe()] cannot create stderr reader: %#w\n", err)
+        return nil, &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/local/StderrPipe()] cannot create stderr reader: %#w\n", err),
+        }
     }
 
     return reader, nil
@@ -101,14 +132,21 @@ func (r *Runner) Run() error {
         var exitErr *exec.ExitError
         if errors.As(err, &exitErr) {
             r.exitCode = exitErr.ProcessState.ExitCode()
-            return fmt.Errorf("[golang-exec/runner/local/Run()] runner failed: %#w\n", err)
+            return &Error{
+                script: r.script,
+                exitCode: r.exitCode,
+                err: fmt.Errorf("[golang-exec/runner/local/Run()] runner failed: %#w\n", err),
+            }
         } else {
             r.exitCode = -1
-            return fmt.Errorf("[golang-exec/runner/local/Run()] cannot execute runner: %#w\n", err)
+            return &Error{
+                script: r.script,
+                exitCode: r.exitCode,
+                err: fmt.Errorf("[golang-exec/runner/local/Run()] cannot execute runner: %#w\n", err),
+            }
         }
     }
 
-    r.exitCode = 0
     return nil
 }
 
@@ -116,7 +154,11 @@ func (r *Runner) Start() error {
     err := r.cmd.Start()
     if err != nil {
         r.exitCode = -1
-        return fmt.Errorf("[golang-exec/runner/local/Start()] cannot start runner: %#w\n", err)
+        return &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/local/Start()] cannot start runner: %#w\n", err),
+        }
     }
 
     return nil
@@ -125,13 +167,17 @@ func (r *Runner) Start() error {
 func (r *Runner) Wait() error {
     err := r.cmd.Wait()
     if err != nil {
-        var exitErr *exec.ExitError
+        var exitErr  *exec.ExitError
         if errors.As(err, &exitErr) {
             r.exitCode = exitErr.ProcessState.ExitCode()
         } else {
             r.exitCode = -1
         }
-        return fmt.Errorf("[golang-exec/runner/local/Wait()] runner failed: %#w\n", err)
+        return &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/local/Wait()] runner failed: %#w\n", err),
+        }
     }
 
     r.exitCode = 0

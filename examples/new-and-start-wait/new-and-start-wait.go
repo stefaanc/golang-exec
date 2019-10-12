@@ -23,8 +23,8 @@ func main() {
     // create script runner
     wd, _ := os.Getwd()
     r, err := runner.New(c, lsScript, lsArguments{
-        Path: wd + "\\doesn't exist",
-//        Path: wd,
+//        Path: wd + "\\doesn't exist",
+        Path: wd,
     })
     if err != nil {
         log.Fatal(err)
@@ -78,17 +78,17 @@ type lsArguments struct{
     Path string
 }
 
-// var lsScript = script.New("ls", "cmd", `
-//     @echo off
-//     set "dirpath={{.Path}}"
-//     dir %dirpath%
-// `)
-
-var lsScript = script.New("ls", "powershell", `
-    $ErrorActionPreference = 'Stop'
-
-    $dirpath = "{{.Path}}"
-    Get-ChildItem -Path $dirpath | Format-Table
-
-    exit 0
+var lsScript = script.New("ls", "cmd", `
+    @echo off
+    set "dirpath={{.Path}}"
+    dir %dirpath%
 `)
+
+// var lsScript = script.New("ls", "powershell", `
+//     $ErrorActionPreference = 'Stop'
+//
+//     $dirpath = "{{.Path}}"
+//     Get-ChildItem -Path $dirpath | Format-Table
+//
+//     exit 0
+// `)

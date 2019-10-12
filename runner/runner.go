@@ -19,6 +19,13 @@ import (
 
 //------------------------------------------------------------------------------
 
+type Error interface {
+    Script() *script.Script
+    ExitCode() int   // -1 when runner error without completing script
+    Error() string
+    Unwrap() error
+}
+
 type Runner interface {
     SetStdoutWriter(io.Writer)
     SetStderrWriter(io.Writer)
@@ -35,7 +42,7 @@ type Runner interface {
 
 //------------------------------------------------------------------------------
 
-func Run(connection interface {}, s *script.Script, arguments interface{}) error {
+func Run(connection interface {}, s *script.Script, arguments interface{}, stdout, stderr io.Writer) error {
     if s.Error != nil {
         return s.Error
     }
@@ -45,6 +52,14 @@ func Run(connection interface {}, s *script.Script, arguments interface{}) error
         return err
     }
     defer r.Close()
+
+    if stdout != nil {
+        r.SetStdoutWriter(stdout)
+    }
+
+    if stderr != nil {
+        r.SetStderrWriter(stderr)
+    }
 
     err = r.Run()
     if err != nil {

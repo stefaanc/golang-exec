@@ -1,6 +1,8 @@
 package main
 
 import (
+    "bytes"
+    "errors"
     "fmt"
     "log"
     "os"
@@ -20,29 +22,38 @@ func main() {
         Insecure: true,
     }
 
+    // create buffers to capture stdout & stderr
+    var stdout bytes.Buffer
+    var stderr bytes.Buffer
+
     // create script runner
     wd, _ := os.Getwd()
-    err := runner.Run(c, rmScript, rmArguments{
+    err := runner.Run(c, lsScript, lsArguments{
 //        Path: wd + "\\doesn't exist",
-        Path: wd + "\\test",
-    })
+        Path: wd,
+    }, &stdout, &stderr)
     if err != nil {
+        var runnerErr runner.Error
+        errors.As(err, &runnerErr)
+        fmt.Printf("exitcode: %d\n", runnerErr.ExitCode())
+
+        fmt.Printf("errors: \n%s\n", stderr.String())
         log.Fatal(err)
     }
 
     // write the result
-    fmt.Printf("done")
+    fmt.Printf("result: \n%s", stdout.String())
 }
 
-type rmArguments struct{
+type lsArguments struct{
     Path string
 }
 
-var rmScript = script.New("rm", "powershell", `
+var lsScript = script.New("ls", "powershell", `
     $ErrorActionPreference = 'Stop'
 
     $dirpath = "{{.Path}}"
-    Get-ChildItem -Path $dirpath | Remove-Item
+    Get-ChildItem -Path $dirpath | Format-Table
 
     exit 0
 `)

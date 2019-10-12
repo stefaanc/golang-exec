@@ -31,7 +31,14 @@ type Connection struct {
     Insecure bool
 }
 
+type Error struct {
+    script   *script.Script
+    exitCode int
+    err      error
+}
+
 type Runner struct {
+    script  *script.Script
     command string
     client  *ssh.Client
     session *ssh.Session
@@ -42,19 +49,34 @@ type Runner struct {
 
 //------------------------------------------------------------------------------
 
+func (e *Error) Script()   *script.Script { return e.script }
+func (e *Error) ExitCode() int            { return e.exitCode }
+func (e *Error) Error()    string         { return e.err.Error() }
+func (e *Error) Unwrap()   error          { return e.err }
+
+//------------------------------------------------------------------------------
+
 func New(connection interface{}, s *script.Script, arguments interface{}) (*Runner, error) {
     if s.Error != nil {
-        return nil, s.Error
+        return nil, &Error{
+            script: s,
+            exitCode: -1,
+            err: fmt.Errorf("[golang-exec/runner/ssh/New()] script failed to parse: %#w\n", s.Error),
+        }
     }
 
     c := toConnection(connection)
     r := new(Runner)
+    r.script = s
     r.command = s.Command()
 
     stdin, err := s.NewReader(arguments)
     if err != nil {
-        r.exitCode = -1
-        return nil, err
+        return nil, &Error{
+            script: s,
+            exitCode: -1,
+            err: fmt.Errorf("[golang-exec/runner/ssh/New()] cannot create stdin reader: %#w\n", err),
+        }
     }
 
     address := fmt.Sprintf("%s:%d", c.Host, c.Port)
@@ -70,29 +92,41 @@ func New(connection interface{}, s *script.Script, arguments interface{}) (*Runn
     } else {
         f, err := homedir.Expand("~/.ssh/known_hosts")
         if err != nil {
-            r.exitCode = -1
-            return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot find home directory of current user: %#w\n", err)
+            return nil, &Error{
+                script: s,
+                exitCode: -1,
+                err: fmt.Errorf("[golang-exec/runner/ssh/New()] cannot find home directory of current user: %#w\n", err),
+            }
         }
 
         hostKeyCallback, err := knownhosts.New(f)
         if err != nil {
-            r.exitCode = -1
-            return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot access 'known_hosts'-file: %#w\n", err)
+            return nil, &Error{
+                script: s,
+                exitCode: -1,
+                err: fmt.Errorf("[golang-exec/runner/ssh/New()] cannot access 'known_hosts'-file: %#w\n", err),
+            }
         }
         config.HostKeyCallback = hostKeyCallback
     }
 
     client, err := ssh.Dial("tcp", address, config)
     if err != nil {
-        r.exitCode = -1
-        return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot dial host: %#w\n", err)
+        return nil, &Error{
+            script: s,
+            exitCode: -1,
+            err: fmt.Errorf("[golang-exec/runner/ssh/New()] cannot dial host: %#w\n", err),
+        }
     }
     r.client = client
 
     session, err := client.NewSession()
     if err != nil {
-        r.exitCode = -1
-        return nil, fmt.Errorf("[golang-exec/runner/ssh/New()] cannot open session: %#w\n", err)
+        return nil, &Error{
+            script: s,
+            exitCode: -1,
+            err: fmt.Errorf("[golang-exec/runner/ssh/New()] cannot open session: %#w\n", err),
+        }
     }
     r.session = session
     r.session.Stdin  = stdin
@@ -158,7 +192,11 @@ func (r *Runner) StdoutPipe() (io.Reader, error) {
     reader, err := r.session.StdoutPipe()
     if err != nil {
         r.exitCode = -1
-        return nil, fmt.Errorf("[golang-exec/runner/ssh/StdoutPipe()] cannot create stdout reader: %#w\n", err)
+        return nil, &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/ssh/StdoutPipe()] cannot create stdout reader: %#w\n", err),
+        }
     }
 
     return reader, nil
@@ -168,7 +206,11 @@ func (r *Runner) StderrPipe() (io.Reader, error) {
     reader, err := r.session.StderrPipe()
     if err != nil {
         r.exitCode = -1
-        return nil, fmt.Errorf("[golang-exec/runner/ssh/StderrPipe()] cannot create stderr reader: %#w\n", err)
+        return nil, &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/ssh/StderrPipe()] cannot create stderr reader: %#w\n", err),
+        }
     }
 
     return reader, nil
@@ -180,10 +222,18 @@ func (r *Runner) Run() error {
         var exitErr *ssh.ExitError
         if errors.As(err, &exitErr) {
             r.exitCode = exitErr.Waitmsg.ExitStatus()
-            return fmt.Errorf("[golang-exec/runner/ssh/Run()] runner failed: %#w\n", err)
+            return &Error{
+                script: r.script,
+                exitCode: r.exitCode,
+                err: fmt.Errorf("[golang-exec/runner/ssh/Run()] runner failed: %#w\n", err),
+            }
         } else {
             r.exitCode = -1
-            return fmt.Errorf("[golang-exec/runner/ssh/Run()] cannot execute runner: %#w\n", err)
+            return &Error{
+                script: r.script,
+                exitCode: r.exitCode,
+                err: fmt.Errorf("[golang-exec/runner/ssh/Run()] cannot execute runner: %#w\n", err),
+            }
         }
     }
 
@@ -195,7 +245,11 @@ func (r *Runner) Start() error {
     err := r.session.Start(r.command)
     if err != nil {
         r.exitCode = -1
-        return fmt.Errorf("[golang-exec/runner/ssh/Start()] cannot start runner: %#w\n", err)
+        return &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/ssh/Start()] cannot start runner: %#w\n", err),
+        }
     }
     r.running = true
 
@@ -212,7 +266,11 @@ func (r *Runner) Wait() error {
         } else {
             r.exitCode = -1
         }
-        return fmt.Errorf("[golang-exec/runner/ssh/Wait()] runner failed: %#w\n", err)
+        return &Error{
+            script: r.script,
+            exitCode: r.exitCode,
+            err: fmt.Errorf("[golang-exec/runner/ssh/Wait()] runner failed: %#w\n", err),
+        }
     }
 
     r.exitCode = 0

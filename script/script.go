@@ -23,7 +23,7 @@ type Script struct {
 
     template   *template.Template
 
-    Error      error    // error from NewScript()
+    Error      error    // error from New()
 }
 
 //------------------------------------------------------------------------------
@@ -103,7 +103,6 @@ func (s *Script) Command() string {
         // hence we save stdin (the rendered code) to a file using cmd and then execute that file using powershell
         //
         // the steps in the command are similar to the steps for the cmd shell
-        s.Shell = "cmd"
         wd, _ := os.Getwd()
         return fmt.Sprintf("cmd /E:ON /V:ON /C \"set \"T=%s\\_temp~%%RANDOM%%.ps1\" && more > !T! && PowerShell -NoProfile -ExecutionPolicy ByPass -Command \"!T!\" & set \"E=!errorlevel!\" & del /Q !T! & exit !E!\"", wd)
     default:

@@ -32,8 +32,8 @@ func main() {
     // create script runner
     wd, _ := os.Getwd()
     r, err := runner.New(c, lsScript, lsArguments{
-        Path: wd + "\\doesn't exist",
-//        Path: wd,
+//        Path: wd + "\\doesn't exist",
+        Path: wd,
     })
     if err != nil {
         log.Fatal(err)
