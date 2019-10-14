@@ -14,8 +14,8 @@ func main() {
         "Type": "ssh",
         "Host": "localhost",
         "Port": "22",
-        "User": "stefaanc",
-        "Password": "iop[111]",
+        "User": "me",
+        "Password": "my-password",
         "Insecure": "true",
     }
 
