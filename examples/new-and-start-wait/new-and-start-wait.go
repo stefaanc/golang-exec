@@ -4,7 +4,6 @@ import (
     "fmt"
     "io/ioutil"
     "log"
-    "os"
     "github.com/stefaanc/golang-exec/runner"
     "github.com/stefaanc/golang-exec/script"
 )
@@ -15,16 +14,18 @@ func main() {
         "Type": "ssh",
         "Host": "localhost",
         "Port": "22",
-        "User": "me",
-        "Password": "my-password",
+        "User": "stefaanc",
+        "Password": "iop[111]",
         "Insecure": "true",
     }
 
     // create script runner
-    wd, _ := os.Getwd()
+    home := "C:\\Users\\" + c["User"]   // for "cmd" and "powershel"
+//    home := "/home/" + c["User"]   // for "bash"
+
     r, err := runner.New(c, lsScript, lsArguments{
-//        Path: wd + "\\doesn't exist",
-        Path: wd,
+//        Path: home + "\\doesn't exist",
+        Path: home,
     })
     if err != nil {
         log.Fatal(err)
@@ -89,6 +90,15 @@ var lsScript = script.New("ls", "cmd", `
 //
 //     $dirpath = "{{.Path}}"
 //     Get-ChildItem -Path $dirpath | Format-Table
+//
+//     exit 0
+// `)
+
+// var lsScript = script.New("ls", "bash", `
+//     set -e -o pipefail
+//
+//     dirpath="{{.Path}}"
+//     ls -la "$dirpath"
 //
 //     exit 0
 // `)

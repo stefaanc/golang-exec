@@ -223,7 +223,7 @@ var lsScript = script.New("ls", "powershell", `
 
 ### Using runner.New() and r.Start() / r.Wait()
 
-To test this, change the `User` and `Password` in the following code (marked).  Alternatively, you can also change the `Type` to `"local"`.  Comment/uncomment the `Path` to select the current working directory or a directory that doesn't exist.
+To test this, change the `User` and `Password` in the following code (marked).  Alternatively, you can also change the `Type` to `"local"`.  Comment/uncomment the `home` directory depending on the type of script you will run.  Comment/uncomment the `Path` to select the home directory or a directory that doesn't exist.
 
 In this example 
 - we use a map for our connection info
@@ -256,10 +256,12 @@ func main() {
     }
 
     // create script runner
-    wd, _ := os.Getwd()
+    home := "C:\\Users\\" + c["User"]             // <<<<<<<<<<<<<<<<<<<< for "cmd" and "powershel"
+//    home := "/home/" + c["User"]                // <<<<<<<<<<<<<<<<<<<< for "bash"
+
     r, err := runner.New(c, lsScript, lsArguments{
-//        Path: wd + "\\doesn't exist",           // <<<<<<<<<<<<<<<<<<<<
-        Path: wd,                                 // <<<<<<<<<<<<<<<<<<<<
+//        Path: home + "\\doesn't exist",         // <<<<<<<<<<<<<<<<<<<<
+        Path: home,                               // <<<<<<<<<<<<<<<<<<<<
     })
     if err != nil {
         log.Fatal(err)
@@ -319,14 +321,23 @@ var lsScript = script.New("ls", "cmd", `
     dir %dirpath%
 `)
 
-\\ var lsScript = script.New("ls", "powershell", `
-\\     $ErrorActionPreference = 'Stop'
-\\ 
-\\     $dirpath = "{{.Path}}"
-\\     Get-ChildItem -Path $dirpath | Format-Table
-\\
-\\     exit 0
-\\ `)
+// var lsScript = script.New("ls", "powershell", `
+//     $ErrorActionPreference = 'Stop'
+// 
+//     $dirpath = "{{.Path}}"
+//     Get-ChildItem -Path $dirpath | Format-Table
+//
+//     exit 0
+// `)
+
+// var lsScript = script.New("ls", "bash", `
+//     set -e -o pipefail
+//
+//     dirpath="{{.Path}}"
+//     ls -la "$dirpath"
+//
+//     exit 0
+// `)
 ```
 
 ![new-and-start-wait-ok.png](docs/screenshots/new-and-start-wait-ok.png)
