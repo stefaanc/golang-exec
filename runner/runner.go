@@ -74,13 +74,11 @@ func New(connection interface {}, s *script.Script, arguments interface{}) (Runn
         return nil, s.Error
     }
 
-    v := reflect.Indirect(reflect.ValueOf(connection))
-    t := reflect.TypeOf(connection)
-
     var cType string
-    if t.Kind() == reflect.Struct {
+    v := reflect.Indirect(reflect.ValueOf(connection))
+    if v.Kind() == reflect.Struct {
         cType = strings.ToLower(v.FieldByName("Type").String())
-    } else {
+    } else {   // panics if not a map
         iter := v.MapRange()
         for iter.Next() {
             if iter.Key().String() == "Type" {

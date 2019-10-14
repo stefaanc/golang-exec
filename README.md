@@ -44,7 +44,7 @@ A couple of very basic examples.
 To test this, change the `User` and `Password` in the following code (marked).  Alternatively, you can also change the `Type` to `"local"`.  Comment/uncomment the `Path` to select the current working directory or a directory that doesn't exist.
 
 In this example
-- we use the `Connection` type from the `"ssh"` runner
+- we use a pointer to the `Connection` type from the `"ssh"` runner
 - we use `runner.Run()` to execute the script
 - we capture the results/errors using a stdout-writer/stderr-writer
 - we capture the exitcode when the script fails
@@ -82,7 +82,7 @@ func main() {
 
     // create script runner
     wd, _ := os.Getwd()
-    err := runner.Run(c, lsScript, lsArguments{
+    err := runner.Run(&c, lsScript, lsArguments{
 //        Path: wd + "\\doesn't exist",           // <<<<<<<<<<<<<<<<<<<<
         Path: wd,                                 // <<<<<<<<<<<<<<<<<<<<
     }, &stdout, &stderr)
@@ -128,7 +128,7 @@ var lsScript = script.New("ls", "powershell", `
 To test this, change the `User` and `Password` in the following code (marked).  Alternatively, you can also change the `Type` to `"local"`.  Comment/uncomment the `Path` to select the current working directory or a directory that doesn't exist.
 
 In this example 
-- we are using our own `Connection` type
+- we use our own `Connection` type
 - we use `runner.New()` to create a runner `r`, then use `r.Run()` to execute the script
 - we capture the results/errors using a stdout-writer/stderr-writer
 - we capture the exitcode when the script succeeds or fails
@@ -226,7 +226,7 @@ var lsScript = script.New("ls", "powershell", `
 To test this, change the `User` and `Password` in the following code (marked).  Alternatively, you can also change the `Type` to `"local"`.  Comment/uncomment the `Path` to select the current working directory or a directory that doesn't exist.
 
 In this example 
-- we are using a map for our connection info
+- we use a map for our connection info
 - we use `runner.New()` to create a runner `r`, then use `r.Start()` & `r.Wait()` to execute the script
 - we use a cmd script instead of a powershell script, but you can also comment/uncomment one of the other ones.
 - we capture results/errors using a stdout-reader/stderr-reader

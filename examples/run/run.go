@@ -28,7 +28,7 @@ func main() {
 
     // create script runner
     wd, _ := os.Getwd()
-    err := runner.Run(c, lsScript, lsArguments{
+    err := runner.Run(&c, lsScript, lsArguments{
 //        Path: wd + "\\doesn't exist",
         Path: wd,
     }, &stdout, &stderr)

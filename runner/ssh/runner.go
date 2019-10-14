@@ -138,16 +138,14 @@ func toConnection(connection interface{}) *Connection {
     c := new(Connection)
 
     v := reflect.Indirect(reflect.ValueOf(connection))
-    t := reflect.TypeOf(connection)
-
-    if t.Kind() == reflect.Struct {
+    if v.Kind() == reflect.Struct {
         c.Type     = v.FieldByName("Type").String()
         c.Host     = v.FieldByName("Host").String()
         c.Port     = uint16( v.FieldByName("Port").Uint() )
         c.User     = v.FieldByName("User").String()
         c.Password = v.FieldByName("Password").String()
         c.Insecure = v.FieldByName("Insecure").Bool()
-    } else if t.Kind() == reflect.Map {
+    } else if v.Kind() == reflect.Map {
         iter := v.MapRange()
         for iter.Next() {
             switch iter.Key().String() {
