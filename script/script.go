@@ -11,6 +11,7 @@ import (
     "fmt"
     "io"
     "os"
+    "math/rand"
     "strings"
     "text/template"
     "time"
@@ -81,6 +82,8 @@ func NewFromFile(name string, shell string, file string) (*Script, error) {
 
 //------------------------------------------------------------------------------
 
+var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func (s *Script) Command() string {
     // returns the command(s) to execute a script that is read from stdin
     switch s.Shell {
@@ -97,7 +100,7 @@ func (s *Script) Command() string {
         // - delete temp-file
         // - exit with saved "%errorlevel%"
         wd, _ := os.Getwd()
-        spath := fmt.Sprintf("%s\\_temp-%d.bat", wd, time.Now().UnixNano())
+        spath := fmt.Sprintf("%s\\_temp-%d.bat", wd, seededRand.Uint64())
         return fmt.Sprintf("cmd /E:ON /V:ON /C \"more > \"%s\" && cmd /C \"%s\" & set \"E=!errorlevel!\" & del /Q \"%s\" & exit !E!\"", spath, spath, spath)
     case "powershell":
         // for powershell, we can  execute code directly from stdin, returning "PowerShell -NoProfile -ExecutionPolicy ByPass -Command -"
@@ -106,7 +109,7 @@ func (s *Script) Command() string {
         //
         // the steps in the command are similar to the steps for the cmd shell
         wd, _ := os.Getwd()
-        spath := fmt.Sprintf("%s\\_temp-%d.ps1", wd, time.Now().UnixNano())
+        spath := fmt.Sprintf("%s\\_temp-%d.ps1", wd, seededRand.Uint64())
         return fmt.Sprintf("cmd /E:ON /V:ON /C \"more > \"%s\" && PowerShell -NoProfile -ExecutionPolicy ByPass -File \"%s\" & set \"E=!errorlevel!\" & del /Q \"%s\" & exit !E!\"", spath, spath, spath)
     default:
         // for bash,... we execute code directly from stdin
