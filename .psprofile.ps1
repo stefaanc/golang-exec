@@ -8,4 +8,4 @@ if ( -not ( Get-Location ).Path.StartsWith("$ROOT") ) {
     Set-Location "$ROOT"
 }
 
-Apply-PSConsoleSettings "GOLANGT-EXEC"
+Apply-PSConsoleSettings "GOLANG-EXEC"
