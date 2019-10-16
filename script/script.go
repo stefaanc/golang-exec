@@ -107,7 +107,7 @@ func (s *Script) Command() string {
         // the steps in the command are similar to the steps for the cmd shell
         wd, _ := os.Getwd()
         spath := fmt.Sprintf("%s\\_temp-%d.ps1", wd, time.Now().UnixNano())
-        return fmt.Sprintf("cmd /E:ON /V:ON /C \"more > \"%s\" && PowerShell -NoProfile -ExecutionPolicy ByPass -Command \"%s\" & set \"E=!errorlevel!\" & del /Q \"%s\" & exit !E!\"", spath, spath, spath)
+        return fmt.Sprintf("cmd /E:ON /V:ON /C \"more > \"%s\" && PowerShell -NoProfile -ExecutionPolicy ByPass -File \"%s\" & set \"E=!errorlevel!\" & del /Q \"%s\" & exit !E!\"", spath, spath, spath)
     default:
         // for bash,... we execute code directly from stdin
         return s.Shell + " -"
