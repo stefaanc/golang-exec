@@ -20,7 +20,7 @@ func main() {
     }
 
     // create script runner
-    home := "C:\\Users\\" + c["User"]   // for "cmd" and "powershel"
+    home := "C:\\Users\\" + c["User"]   // for "cmd" and "powershell"
 //    home := "/home/" + c["User"]   // for "bash"
 
     r, err := runner.New(c, lsScript, lsArguments{
@@ -66,7 +66,8 @@ func main() {
     err = r.Wait()
     if err != nil {
         fmt.Printf("exitcode: %d\n", r.ExitCode())
-        fmt.Printf("errors: \n%s\n", string(errors))
+        fmt.Printf("stdout: \n%s", string(result))
+        fmt.Printf("stderr: \n%s\n", string(errors))
         log.Fatal(err)
     }
 

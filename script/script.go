@@ -13,6 +13,7 @@ import (
     "os"
     "strings"
     "text/template"
+    "time"
 )
 
 //------------------------------------------------------------------------------
@@ -96,7 +97,8 @@ func (s *Script) Command() string {
         // - delete temp-file
         // - exit with saved "%errorlevel%"
         wd, _ := os.Getwd()
-        return fmt.Sprintf("cmd /E:ON /V:ON /C \"set \"T=%s\\_temp-%%RANDOM%%.bat\" && more > !T! && cmd /C \"!T!\" & set \"E=!errorlevel!\" & del /Q !T! & exit !E!\"", wd)
+        spath := fmt.Sprintf("%s\\_temp-%d.bat", wd, time.Now().UnixNano())
+        return fmt.Sprintf("cmd /E:ON /V:ON /C \"more > \"%s\" && cmd /C \"%s\" & set \"E=!errorlevel!\" & del /Q \"%s\" & exit !E!\"", spath, spath, spath)
     case "powershell":
         // for powershell, we can  execute code directly from stdin, returning "PowerShell -NoProfile -ExecutionPolicy ByPass -Command -"
         // however, it seems that fatal exceptions don't stop the script, and thus "$ErrorActionPreference = 'Stop'" also doesn't work properly
@@ -104,7 +106,8 @@ func (s *Script) Command() string {
         //
         // the steps in the command are similar to the steps for the cmd shell
         wd, _ := os.Getwd()
-        return fmt.Sprintf("cmd /E:ON /V:ON /C \"set \"T=%s\\_temp~%%RANDOM%%.ps1\" && more > !T! && PowerShell -NoProfile -ExecutionPolicy ByPass -Command \"!T!\" & set \"E=!errorlevel!\" & del /Q !T! & exit !E!\"", wd)
+        spath := fmt.Sprintf("%s\\_temp-%d.ps1", wd, time.Now().UnixNano())
+        return fmt.Sprintf("cmd /E:ON /V:ON /C \"more > \"%s\" && PowerShell -NoProfile -ExecutionPolicy ByPass -Command \"%s\" & set \"E=!errorlevel!\" & del /Q \"%s\" & exit !E!\"", spath, spath, spath)
     default:
         // for bash,... we execute code directly from stdin
         return s.Shell + " -"
