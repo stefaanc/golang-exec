@@ -52,7 +52,8 @@ func main() {
     err = r.Run()
     if err != nil {
         fmt.Printf("exitcode: %d\n", r.ExitCode())
-        fmt.Printf("errors: \n%s\n", stderr.String())
+        fmt.Printf("stdout: \n%s\n", stdout.String())
+        fmt.Printf("stderr: \n%s\n", stderr.String())
         log.Fatal(err)
     }
 

@@ -33,6 +33,7 @@ type Connection struct {
 
 type Error struct {
     script   *script.Script
+    command  string
     exitCode int
     err      error
 }
@@ -50,6 +51,7 @@ type Runner struct {
 //------------------------------------------------------------------------------
 
 func (e *Error) Script()   *script.Script { return e.script }
+func (e *Error) Command()  string         { return e.command }
 func (e *Error) ExitCode() int            { return e.exitCode }
 func (e *Error) Error()    string         { return e.err.Error() }
 func (e *Error) Unwrap()   error          { return e.err }
@@ -222,6 +224,7 @@ func (r *Runner) Run() error {
             r.exitCode = exitErr.Waitmsg.ExitStatus()
             return &Error{
                 script: r.script,
+                command: r.command,
                 exitCode: r.exitCode,
                 err: fmt.Errorf("[golang-exec/runner/ssh/Run()] runner failed: %#w\n", err),
             }
@@ -229,6 +232,7 @@ func (r *Runner) Run() error {
             r.exitCode = -1
             return &Error{
                 script: r.script,
+                command: r.command,
                 exitCode: r.exitCode,
                 err: fmt.Errorf("[golang-exec/runner/ssh/Run()] cannot execute runner: %#w\n", err),
             }
@@ -245,6 +249,7 @@ func (r *Runner) Start() error {
         r.exitCode = -1
         return &Error{
             script: r.script,
+            command: r.command,
             exitCode: r.exitCode,
             err: fmt.Errorf("[golang-exec/runner/ssh/Start()] cannot start runner: %#w\n", err),
         }
@@ -266,6 +271,7 @@ func (r *Runner) Wait() error {
         }
         return &Error{
             script: r.script,
+            command: r.command,
             exitCode: r.exitCode,
             err: fmt.Errorf("[golang-exec/runner/ssh/Wait()] runner failed: %#w\n", err),
         }

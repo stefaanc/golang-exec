@@ -36,8 +36,8 @@ func main() {
         var runnerErr runner.Error
         errors.As(err, &runnerErr)
         fmt.Printf("exitcode: %d\n", runnerErr.ExitCode())
-
-        fmt.Printf("errors: \n%s\n", stderr.String())
+        fmt.Printf("stdout: \n%s", stdout.String())
+        fmt.Printf("stderr: \n%s\n", stderr.String())
         log.Fatal(err)
     }
 

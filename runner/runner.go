@@ -21,6 +21,7 @@ import (
 
 type Error interface {
     Script() *script.Script
+    Command() string
     ExitCode() int   // -1 when runner error without completing script
     Error() string
     Unwrap() error

@@ -26,14 +26,16 @@ type Connection struct {
 
 type Error struct {
     script   *script.Script
+    command  string
     exitCode int
     err      error
 }
 
 type Runner struct {
-    script *script.Script
-    cmd    *exec.Cmd
-    cancel context.CancelFunc
+    script  *script.Script
+    command string
+    cmd     *exec.Cmd
+    cancel  context.CancelFunc
 
     exitCode int
 }
@@ -41,6 +43,7 @@ type Runner struct {
 //------------------------------------------------------------------------------
 
 func (e *Error) Script()   *script.Script { return e.script }
+func (e *Error) Command()  string         { return e.command }
 func (e *Error) ExitCode() int            { return e.exitCode }
 func (e *Error) Error()    string         { return e.err.Error() }
 func (e *Error) Unwrap()   error          { return e.err }
@@ -58,6 +61,7 @@ func New(connection interface{}, s *script.Script, arguments interface{}) (*Runn
 
     r := new(Runner)
     r.script = s
+    r.command = s.Command()
 
     stdin, err := s.NewReader(arguments)
     if err != nil {
@@ -70,7 +74,7 @@ func New(connection interface{}, s *script.Script, arguments interface{}) (*Runn
 
     // create command, ready to start
     ctx, cancel := context.WithCancel(context.Background())
-    args := strings.Split(s.Command(), " ")
+    args := strings.Split(r.command, " ")
     var cmd *exec.Cmd
     if args[0] == "cmd" {
         // cmd has argument-escaping rules that are different from other programs, so needs different treatment
@@ -134,6 +138,7 @@ func (r *Runner) Run() error {
             r.exitCode = exitErr.ProcessState.ExitCode()
             return &Error{
                 script: r.script,
+                command: r.command,
                 exitCode: r.exitCode,
                 err: fmt.Errorf("[golang-exec/runner/local/Run()] runner failed: %#w\n", err),
             }
@@ -141,6 +146,7 @@ func (r *Runner) Run() error {
             r.exitCode = -1
             return &Error{
                 script: r.script,
+                command: r.command,
                 exitCode: r.exitCode,
                 err: fmt.Errorf("[golang-exec/runner/local/Run()] cannot execute runner: %#w\n", err),
             }
@@ -156,6 +162,7 @@ func (r *Runner) Start() error {
         r.exitCode = -1
         return &Error{
             script: r.script,
+            command: r.command,
             exitCode: r.exitCode,
             err: fmt.Errorf("[golang-exec/runner/local/Start()] cannot start runner: %#w\n", err),
         }
@@ -175,6 +182,7 @@ func (r *Runner) Wait() error {
         }
         return &Error{
             script: r.script,
+            command: r.command,
             exitCode: r.exitCode,
             err: fmt.Errorf("[golang-exec/runner/local/Wait()] runner failed: %#w\n", err),
         }
